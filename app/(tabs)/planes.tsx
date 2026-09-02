@@ -1,58 +1,53 @@
-import React, { useState } from 'react';
+// app/(tabs)/planes.tsx
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Modal } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 
+import { usePerfil } from '@/contexts/PerfilContext';
+import { escucharPlanes, crearPlan, borrarPlan, moverPlan, type Plan } from '@/services/planes';
+
 export default function PlanesScreen() {
+  const { perfil } = usePerfil();
   const [plan, setPlan] = useState('');
-  const [pendientes, setPendientes] = useState<string[]>([]);
-  const [hechos, setHechos] = useState<string[]>([]);
+  const [todosLosPlanes, setTodosLosPlanes] = useState<Plan[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [planABorrar, setPlanABorrar] = useState<{index: number, esPendiente: boolean} | null>(null);
+  const [planABorrar, setPlanABorrar] = useState<string | null>(null);
+
+  useEffect(() => {
+    const cancelar = escucharPlanes(setTodosLosPlanes);
+    return cancelar;
+  }, []);
+
+  const pendientes = todosLosPlanes.filter((p) => !p.hecho);
+  const hechos = todosLosPlanes.filter((p) => p.hecho);
 
   const agregarPlan = () => {
-    if (plan.trim()) {
-      setPendientes([plan, ...pendientes]);
+    if (plan.trim() && perfil) {
+      crearPlan(plan.trim(), perfil);
       setPlan('');
     }
   };
 
-  const confirmarBorrado = (index: number, esPendiente: boolean) => {
-    setPlanABorrar({ index, esPendiente });
+  const confirmarBorrado = (id: string) => {
+    setPlanABorrar(id);
     setModalVisible(true);
   };
 
   const ejecutarBorrado = () => {
     if (planABorrar) {
-      const { index, esPendiente } = planABorrar;
-      if (esPendiente) {
-        setPendientes(pendientes.filter((_, i) => i !== index));
-      } else {
-        setHechos(hechos.filter((_, i) => i !== index));
-      }
+      borrarPlan(planABorrar);
     }
     setModalVisible(false);
   };
 
-  const moverPlan = (index: number, esPendiente: boolean) => {
-    if (esPendiente) {
-      const p = pendientes[index];
-      setHechos([p, ...hechos]);
-      setPendientes(pendientes.filter((_, i) => i !== index));
-    } else {
-      const h = hechos[index];
-      setPendientes([h, ...pendientes]);
-      setHechos(hechos.filter((_, i) => i !== index));
-    }
-  };
-
-  const renderPlan = (item: string, index: number, esPendiente: boolean) => (
+  const renderPlan = (item: Plan) => (
     <View style={styles.planCard}>
-      <Text style={[styles.planText, !esPendiente && styles.hechoText]}>{item}</Text>
+      <Text style={[styles.planText, item.hecho && styles.hechoText]}>{item.texto}</Text>
       <View style={styles.buttonContainer}>
-        <TouchableOpacity onPress={() => moverPlan(index, esPendiente)} style={styles.actionBtn}>
-          <Text style={{fontSize: 18}}>{esPendiente ? '✔️' : '❌'}</Text>
+        <TouchableOpacity onPress={() => moverPlan(item.id, item.hecho)} style={styles.actionBtn}>
+          <Text style={{fontSize: 18}}>{!item.hecho ? '✔️' : '❌'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => confirmarBorrado(index, esPendiente)} style={styles.actionBtn}>
+        <TouchableOpacity onPress={() => confirmarBorrado(item.id)} style={styles.actionBtn}>
           <Text style={{fontSize: 18}}>🗑️</Text>
         </TouchableOpacity>
       </View>
@@ -62,11 +57,11 @@ export default function PlanesScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Nuestros Planes 📋</Text>
-      
+
       <View style={styles.inputContainer}>
-        <TextInput 
-          style={styles.input} 
-          placeholder="¿Que te gustaria hacer?" 
+        <TextInput
+          style={styles.input}
+          placeholder="¿Que te gustaria hacer?"
           value={plan}
           onChangeText={setPlan}
         />
@@ -76,20 +71,19 @@ export default function PlanesScreen() {
       </View>
 
       <Text style={styles.sectionTitle}>Nuestra lista de planes</Text>
-      <FlatList 
+      <FlatList
         data={pendientes}
-        renderItem={({ item, index }) => renderPlan(item, index, true)}
-        keyExtractor={(_, index) => 'p' + index}
+        renderItem={({ item }) => renderPlan(item)}
+        keyExtractor={(item) => item.id}
       />
 
       <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Planes ya hechos ✅</Text>
-      <FlatList 
+      <FlatList
         data={hechos}
-        renderItem={({ item, index }) => renderPlan(item, index, false)}
-        keyExtractor={(_, index) => 'h' + index}
+        renderItem={({ item }) => renderPlan(item)}
+        keyExtractor={(item) => item.id}
       />
 
-      {/* Modal de Confirmación */}
       <Modal visible={modalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -125,11 +119,11 @@ const styles = StyleSheet.create({
   modalContent: { backgroundColor: 'white', padding: 25, borderRadius: 20, alignItems: 'center', width: '80%' },
   modalText: { fontSize: 18, marginBottom: 20, color: '#333' },
   modalButtons: { flexDirection: 'row', gap: 20 },
- btn: { 
-    paddingVertical: 10, 
-    borderRadius: 10, 
-    width: 100, // <--- ESTO ES LA CLAVE: fijamos un ancho igual para ambos
-    alignItems: 'center', // <--- Esto centra el texto adentro
+  btn: {
+    paddingVertical: 10,
+    borderRadius: 10,
+    width: 100,
+    alignItems: 'center',
   },
   btnNo: { backgroundColor: '#FF85A1' },
   btnSi: { backgroundColor: '#FF85A1' }

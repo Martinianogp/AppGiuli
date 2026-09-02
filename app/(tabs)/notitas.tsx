@@ -1,33 +1,34 @@
+// app/(tabs)/notitas.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Modal } from 'react-native';
+
+import { usePerfil } from '@/contexts/PerfilContext';
+import { escucharNotitas, crearNotita, borrarNotita, toggleFavoritaNotita, type Notita } from '@/services/notitas';
 
 const COLORES_PASTELES = ['#FFF9C4', '#B3E5FC', '#C8E6C9', '#F8BBD0', '#E1BEE7', '#BBDEFB', '#D1C4E9', '#FFFFFF'];
 
 export default function NotitasScreen() {
+  const { perfil } = usePerfil();
   const [nota, setNota] = useState('');
   const [colorSeleccionado, setColorSeleccionado] = useState('#FFF9C4');
-  const [listaNotitas, setListaNotitas] = useState<{id: string, texto: string, fecha: number, favorita: boolean, color: string, autor: string}[]>([]);
+  const [listaNotitas, setListaNotitas] = useState<Notita[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [notaAAccion, setNotaAAccion] = useState<{id: string, tipo: 'borrar' | 'desfavoritar'} | null>(null);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const ahora = new Date().getTime();
-      setListaNotitas(prev => prev.filter(n => n.favorita || (ahora - n.fecha) < 86400000));
-    }, 60000);
-    return () => clearInterval(interval);
+    const cancelar = escucharNotitas(setListaNotitas);
+    return cancelar;
   }, []);
 
   const agregarNota = () => {
-    if (nota.trim()) {
-      const nuevaNota = { id: Date.now().toString(), texto: nota, fecha: Date.now(), favorita: false, color: colorSeleccionado, autor: 'Marti' };
-      setListaNotitas([nuevaNota, ...listaNotitas]);
+    if (nota.trim() && perfil) {
+      crearNotita(nota.trim(), colorSeleccionado, perfil);
       setNota('');
     }
   };
 
-  const toggleFavorito = (id: string) => {
-    setListaNotitas(listaNotitas.map(n => n.id === id ? { ...n, favorita: !n.favorita } : n));
+  const toggleFavorito = (id: string, favoritaActual: boolean) => {
+    toggleFavoritaNotita(id, favoritaActual);
   };
 
   const confirmarAccion = (id: string, tipo: 'borrar' | 'desfavoritar') => {
@@ -38,9 +39,9 @@ export default function NotitasScreen() {
   const ejecutarAccion = () => {
     if (notaAAccion) {
       if (notaAAccion.tipo === 'borrar') {
-        setListaNotitas(listaNotitas.filter(n => n.id !== notaAAccion.id));
+        borrarNotita(notaAAccion.id);
       } else {
-        toggleFavorito(notaAAccion.id);
+        toggleFavoritaNotita(notaAAccion.id, true);
       }
     }
     setModalVisible(false);
@@ -61,7 +62,7 @@ export default function NotitasScreen() {
         <TouchableOpacity style={styles.addButton} onPress={agregarNota}><Text style={styles.addButtonText}>+</Text></TouchableOpacity>
       </View>
 
-      <FlatList 
+      <FlatList
         data={listaNotitas}
         numColumns={2}
         keyExtractor={(item) => item.id}
@@ -70,7 +71,7 @@ export default function NotitasScreen() {
             <Text style={styles.notaText}>{item.texto}</Text>
             <Text style={styles.autorText}>{item.autor}</Text>
             <View style={styles.buttonContainer}>
-              <TouchableOpacity onPress={() => item.favorita ? confirmarAccion(item.id, 'desfavoritar') : toggleFavorito(item.id)}>
+              <TouchableOpacity onPress={() => item.favorita ? confirmarAccion(item.id, 'desfavoritar') : toggleFavorito(item.id, item.favorita)}>
                 <Text style={styles.actionIcon}>{item.favorita ? '💖' : '🩶'}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => confirmarAccion(item.id, 'borrar')}>
@@ -105,13 +106,13 @@ const styles = StyleSheet.create({
   input: { flex: 1, backgroundColor: 'white', padding: 12, borderRadius: 12, marginRight: 10 },
   addButton: { backgroundColor: '#FF85A1', width: 45, height: 45, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   addButtonText: { color: 'white', fontSize: 24, fontWeight: 'bold' },
-  
+
   notaCard: { flex: 1, margin: 5, padding: 10, borderRadius: 12, minHeight: 80, justifyContent: 'space-between' },
-  notaText: { fontSize: 15, color: '#333', fontWeight: '600' }, // Más grande y relleno
-  autorText: { fontSize: 10, color: '#888', marginTop: 5 }, // Nombre pequeño y gris
+  notaText: { fontSize: 15, color: '#333', fontWeight: '600' },
+  autorText: { fontSize: 10, color: '#888', marginTop: 5 },
   buttonContainer: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 5 },
   actionIcon: { fontSize: 18, marginLeft: 8 },
-  
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: 'white', padding: 25, borderRadius: 20, alignItems: 'center', width: '80%' },
   modalText: { fontSize: 18, marginBottom: 20, color: '#333' },

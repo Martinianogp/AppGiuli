@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "AppGiuli",
+    "name": "G+M",
     "slug": "AppGiuli",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -19,7 +19,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.martinianogp.AppGiuli"
     },
     "web": {
       "output": "static",
@@ -43,6 +44,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "baec286c-478d-4938-a612-5b7f6064f8b7"
+      }
     }
   }
 }

@@ -1,32 +1,46 @@
+// app/(tabs)/index.tsx
 import { FontAwesome } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { usePerfil } from '@/contexts/PerfilContext';
+import { enviarBesito, escucharBesitosDeHoy, escucharRecords, type BesitosDelDia, type Records } from '@/services/besitos';
+import { actualizarMiEstado, escucharEstados, type Estados } from '@/services/estados';
+
+
 export default function AmorScreen() {
-  const [besitosHoy, setBesitosHoy] = useState(0);
-  const [recordBesitos, setRecordBesitos] = useState(0);
-  const [miEstado, setMiEstado] = useState('Aún no dice');
-  const [diaActual, setDiaActual] = useState(new Date().getDate());
+  const { perfil, cambiarPerfil } = usePerfil();
+  const [besitos, setBesitos] = useState<BesitosDelDia>({ Marti: 0, Giuli: 0 });
+  const [records, setRecords] = useState<Records>({ Marti: 0, Giuli: 0 });
+  const [estados, setEstados] = useState<Estados>({ Marti: 'Aún no dice', Giuli: 'Aún no dice' });
   const [tiempoJuntos, setTiempoJuntos] = useState({ meses: 0, dias: 0, horas: 0 });
 
-  // Lógica del contador de días y meses (19 de Mayo 2026)
+  useEffect(() => {
+    const cancelarBesitos = escucharBesitosDeHoy(setBesitos);
+    const cancelarRecords = escucharRecords(setRecords);
+    const cancelarEstados = escucharEstados(setEstados);
+    return () => {
+      cancelarBesitos();
+      cancelarRecords();
+      cancelarEstados();
+    };
+  }, []);
+
   useEffect(() => {
     const calcularTiempo = () => {
       const inicio = new Date('2026-05-19T00:00:00');
       const ahora = new Date();
-      
+
       let meses = (ahora.getFullYear() - inicio.getFullYear()) * 12 + (ahora.getMonth() - inicio.getMonth());
       let dias = ahora.getDate() - inicio.getDate();
-      
-      // Ajuste si no llegamos al día 19 del mes actual
+
       if (dias < 0) {
         meses--;
         const mesAnterior = new Date(ahora.getFullYear(), ahora.getMonth(), 0);
         dias += mesAnterior.getDate();
       }
 
-      const horas = ahora.getHours(); // O si prefieres las horas transcurridas desde las 00hs
-      
+      const horas = ahora.getHours();
       setTiempoJuntos({ meses, dias, horas });
     };
 
@@ -35,24 +49,17 @@ export default function AmorScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // Lógica de reinicio diario
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const ahora = new Date();
-      if (ahora.getDate() !== diaActual) {
-        if (besitosHoy > recordBesitos) setRecordBesitos(besitosHoy);
-        setBesitosHoy(0);
-        setDiaActual(ahora.getDate());
-      }
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [besitosHoy, diaActual, recordBesitos]);
-
-  const enviarBesito = () => {
-    const nuevoTotal = besitosHoy + 1;
-    setBesitosHoy(nuevoTotal);
-    if (nuevoTotal > recordBesitos) setRecordBesitos(nuevoTotal);
+  const enviarBesitoClick = () => {
+    if (!perfil) return;
+    enviarBesito(perfil);
   };
+
+  const elegirEstado = (emoji: string) => {
+    if (!perfil) return;
+    actualizarMiEstado(perfil, emoji);
+  };
+
+  if (!perfil) return null;
 
   return (
     <ScrollView style={styles.container}>
@@ -63,14 +70,18 @@ export default function AmorScreen() {
 
       <View style={styles.card}>
         <Text style={styles.cardLabel}>MANDAR UN BESITO</Text>
-        <TouchableOpacity style={styles.heartCircle} onPress={enviarBesito}>
+        <TouchableOpacity style={styles.heartCircle} onPress={enviarBesitoClick}>
           <FontAwesome name="heart" size={60} color="white" />
         </TouchableOpacity>
-        <Text style={styles.count}>{besitosHoy}</Text>
-        <Text style={styles.countLabel}>Besos enviados hoy</Text>
+        <Text style={styles.count}>{besitos.Marti + besitos.Giuli}</Text>
+        <Text style={styles.countLabel}>Besos enviados hoy entre los dos 💕</Text>
         <View style={styles.recordContainer}>
-          <Text style={styles.recordLabel}>Record de besitos: </Text>
-          <Text style={styles.recordValue}>{recordBesitos}</Text>
+          <Text style={styles.recordLabel}>Record Marti: </Text>
+          <Text style={styles.recordValue}>{records.Marti}</Text>
+        </View>
+        <View style={styles.recordContainer}>
+          <Text style={styles.recordLabel}>Record Giuli: </Text>
+          <Text style={styles.recordValue}>{records.Giuli}</Text>
         </View>
       </View>
 
@@ -78,28 +89,26 @@ export default function AmorScreen() {
         <Text style={styles.cardLabel}>¿CÓMO ESTAMOS HOY?</Text>
         <View style={styles.statusRow}>
           <View style={styles.avatar}><Text style={{fontSize: 24}}>👦</Text></View>
-          <View><Text style={styles.statusName}>Marti</Text><Text style={styles.statusText}>{miEstado}</Text></View>
+          <View><Text style={styles.statusName}>Marti</Text><Text style={styles.statusText}>{estados.Marti}</Text></View>
         </View>
-        
-        {/* Espacio extra solicitado */}
+
         <View style={{ height: 20 }} />
 
         <View style={styles.statusRow}>
           <View style={styles.avatar}><Text style={{fontSize: 24}}>👧</Text></View>
-          <View><Text style={styles.statusName}>Giuli</Text><Text style={styles.statusText}>Aún no dice</Text></View>
+          <View><Text style={styles.statusName}>Giuli</Text><Text style={styles.statusText}>{estados.Giuli}</Text></View>
         </View>
-        
+
         <Text style={styles.changeStatusLabel}>Cambiar mi estado:</Text>
         <View style={styles.emojiRow}>
           {['🥰', '😋', '😢', '😴', '😍', '🍟'].map((e) => (
-            <TouchableOpacity key={e} onPress={() => setMiEstado(e)}>
+            <TouchableOpacity key={e} onPress={() => elegirEstado(e)}>
               <Text style={{fontSize: 28}}>{e}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* Contador de tiempo mejorado */}
       <View style={{ alignItems: 'center', marginVertical: 30 }}>
         <Text style={{ color: '#999', fontSize: 16 }}>Juntos hace:</Text>
         <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#E11D48', marginTop: 5, textAlign: 'center' }}>
@@ -108,6 +117,12 @@ export default function AmorScreen() {
           {tiempoJuntos.horas} {tiempoJuntos.horas === 1 ? 'hora' : 'horas'}
         </Text>
       </View>
+
+      {/* Botón para cambiar de perfil */}
+      <TouchableOpacity onPress={cambiarPerfil} style={styles.cambiarPerfilBtn}>
+        <Text style={styles.cambiarPerfilText}>Cambiar perfil</Text>
+      </TouchableOpacity>
+
     </ScrollView>
   );
 }
@@ -130,5 +145,7 @@ const styles = StyleSheet.create({
   statusName: { fontSize: 12, color: '#999' },
   statusText: { fontSize: 16 },
   changeStatusLabel: { fontSize: 12, color: '#999', textAlign: 'center', marginTop: 20 },
-  emojiRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 }
+  emojiRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 },
+  cambiarPerfilBtn: { alignItems: 'center', padding: 10, marginBottom: 30 },
+  cambiarPerfilText: { color: '#ccc', fontSize: 12 },
 });
